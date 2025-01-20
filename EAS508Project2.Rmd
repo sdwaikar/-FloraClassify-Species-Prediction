@@ -1,0 +1,454 @@
+EAS508STATSLEARNING1
+
+Project 2 - Classification Methods for IRIS Dataset
+
+Team - [Rishabh Kanodiya, Atharv Hejib, Shreyas Waikar, Devansh Pratap Singh, Akash Patel]
+
+Method - 1 (Multinomial Logistic Regression)
+
+Building a Predictive model using Logistic Regression that minimizes test misclassification rate. 
+Then using cross validaion to estimate the error rate.
+
+We are building a multinomial logistic regression as this dataset contains three classes - [SETOSA, VERSICOLOR, VIRGIINICA]
+
+```{r}
+# Loading the dataset
+
+#install.packages("caret")
+library(caret)
+library(class)
+library(nnet)
+
+iris <- read.csv("iris.data", header = FALSE)
+names(iris) <- c("SepalLength", "SepalWidth", "PetalLength", "PetalWidth", "Classes")
+```
+
+
+```{r}
+# Making Class as a factor
+
+iris$Classes <- as.factor(iris$Classes) # converting the Classes column in the iris data frame to a factor
+```
+
+
+
+```{r}
+# Splitting the data into training and testing sets
+
+set.seed(123) # random number generator
+index <- sample(1:nrow(iris), size = 0.7*nrow(iris)) # Randomly samples 70% of the row indices from the created sequence
+train <- iris[index,] # training data set split
+test <- iris[-index,] # testing data set split
+```
+
+
+
+```{r}
+# Building multinomial Logistic Regression model on training data set
+
+# Classes is our dependent variable
+
+# data = train, specifies the data frame where the variables are stored
+
+multinom_model <- multinom(Classes ~ ., data = train, family = 'binomial')
+```
+
+
+```{r}
+# Making predictions on test data 
+
+# There are 45 testing data points as per our 70 - 30 split
+
+# multinom_preds_class stores the predicted classes for testing data
+multinom_preds_class <- predict(multinom_model, newdata = test, type = "class")
+
+# multinom_preds_probs stores the predicted probabilities for testing data
+multinom_preds_probs <- predict(multinom_model, newdata = test, type = "probs")
+
+# predicted_classes stores the classes for testing data, it selects the maximum probability for every data point. 
+
+# The multino_preds_probs holds the probability for each of the class for every data point, the maximum probability out of the three classes is assigned as the class for the given data point.
+
+predicted_classes <- colnames(multinom_preds_probs)[apply(multinom_preds_probs, 1, which.max)]
+
+```
+
+
+
+```{r}
+predicted_classes # classes predicted for test data points by our model based on probabilities for each class
+```
+
+
+```{r}
+# Comparing predictions to true correct classes
+
+# misclass_rate will be the percentage of observations in the test set for which the predicted class labels do not match the true class labels.
+
+misclass_rate <- mean(predicted_classes != test$Classes)
+
+# This is just to print the misclassification rate in percentage format
+
+print(paste("Test Misclassification Rate is :", round(misclass_rate * 100, 2), "%"))
+```
+
+
+```{r}
+# Applying cross validation on our own model
+
+# Create 10 folds for cross-validation
+
+folds <- createFolds(train$Classes, k = 10)
+
+# List to store accuracy for each fold
+
+accuracies <- list()
+
+#Performing 10-cross validation
+
+for(i in 1:10){
+  
+  # Select fold for testing 
+  test_index <- folds[[i]]
+  test_fold <- train[test_index,]
+  
+  
+  # Remaining folds for training
+  train_fold <- train[-test_index,] 
+  
+  # Train model on training folds 
+  model <- multinom(Classes ~ ., data = train_fold)
+  
+  # Make predictions on test fold
+  preds <- predict(model, test_fold)
+  
+  # Calculate accuracy 
+  accuracy <- mean(preds == test_fold$Classes)
+  
+  # Store accuracy
+  accuracies[[i]] <- accuracy
+}
+
+# Calculate mean accuracy
+mean_accuracy = mean(unlist(accuracies))
+accuracy_in_percentage = mean_accuracy * 100
+print(paste("Mean Accuracy for our multinomial logistic model after 10 fold cross validation comes out to be", accuracy_in_percentage, "%"))
+
+error_in_percentage = (1 - mean_accuracy) * 100
+print(paste("Mean Error percentage of our multinomial logistic model after 10 fold cross validation comes out to be", error_in_percentage, "%"))
+```
+
+
+Method - 2 (KNN Classification)
+
+
+Building a Predictive model using KNN classification that minimizes test misclassification rate. 
+Then using cross validaion to estimate the error rate.
+
+We are building a KNN classifier
+
+```{r}
+set.seed(123)
+indices <- sample(1:nrow(iris), 0.70 * nrow(iris))
+train_data <- iris[indices, ]
+test_data <- iris[-indices, ]
+
+```
+
+
+```{r}
+nrow(train_data)
+nrow(test_data)
+
+```
+
+
+```{r}
+
+knn_model <- knn(train = train_data[, 1:4], test = test_data[, 1:4], cl = train_data$Classes, k = 5)
+
+```
+
+
+```{r}
+confusion_matrix = table(knn_model, test_data$Classes)
+confusion_matrix
+```
+
+
+```{r}
+sum(diag(confusion_matrix))
+nrow(test_data)
+
+```
+
+
+```{r}
+misclassification_rate <- 1 - sum(diag(confusion_matrix)) / nrow(test_data)
+
+```
+
+
+```{r}
+cat("Test Misclassification Rate:", round(misclassification_rate*100,2), "%")
+```
+
+
+```{r}
+
+
+# Convert Classes to factor
+iris$Classes <- as.factor(iris$Classes)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Perform 10-fold cross-validation
+k <- 10
+folds <- cut(seq(1, nrow(iris)), breaks = k, labels = FALSE)
+cv_results <- numeric(k)
+
+for (i in 1:k) {
+  test_indices <- which(folds == i, arr.ind = TRUE)
+  test_data <- iris[test_indices, ]
+  train_data <- iris[-test_indices, ]
+  
+  
+  knn_model <- knn(train = train_data[, 1:4], test = test_data[, 1:4], cl = train_data$Classes, k = 5)
+  
+  # Evaluate accuracy for each fold
+  cv_results[i] <- sum(knn_model == test_data$Classes) / length(test_data$Classes)
+}
+
+# Display average accuracy across folds
+cat("Average Accuracy:", mean(cv_results), "\n")
+
+error_in_percentage = (1 -  mean(cv_results)) * 100
+print(paste("Mean Error percentage of knn model after 10 fold cross validation comes out to be", error_in_percentage, "%"))
+
+
+```
+
+
+Method - 3 (Decision Tree)
+
+Building a Predictive model using Decision Tree that minimizes test misclassification rate. 
+Then using cross validaion to estimate the error rate.
+
+We are building a Decision Tree
+
+```{r}
+# Load required libraries
+# install.packages('party')
+# install.packages('rpart.plot')
+
+# Setting seed id commonly used in statistical contexts to ensure reproducibility
+
+set.seed(123)
+
+library(party) # This library includes functions for creating and visualizing decision trees
+library(rpart) # This library is specifically focused on recursive partitioning
+library(rpart.plot) # This library enhances the visualization of decision trees and makes them more interpretable.
+
+index <- sample(1:nrow(iris), size = 0.7*nrow(iris)) # Randomly samples 70% of the row indices from the created sequence
+train <- iris[index,] # training data set split
+test <- iris[-index,] # testing data set split
+
+
+# Split the data into training and test sets
+
+# generates a random sample of indices (1 or 2) with replacement for each row in the Iris dataset, creating a binary indicator variable (biv) with approximately 70% of values being 1 and 30% being 2
+biv <- sample(2, nrow(iris), replace = TRUE, prob = c(0.7, 0.3)) 
+
+
+# Train a decision tree model using the training data (train) 
+tree <- rpart(Classes ~ ., data = train)
+
+# Visualize the decision tree model
+rpart.plot(tree)
+```
+
+```{r}
+# Make predictions on the test set
+predictions <- predict(tree, test, type = "class")
+
+# Evaluate the model performance
+conf_matrix <- table(predictions, test$Classes)
+misclassification_rate <- 1 - sum(diag(conf_matrix)) / sum(conf_matrix)
+
+# Print the confusion matrix and misclassification rate
+print(conf_matrix)
+cat("Misclassification Rate:", misclassification_rate, "\n")
+cat("Misclassification Percentage Error:", misclassification_rate*100, "%\n")
+```
+
+```{r}
+# Train a decision tree model with k-fold cross-validation
+k <- 10 # Number of folds
+
+cv <- rpart.control(cp = -1, minsplit = 2, xval = k) # Sets up control parameters for cross-validated tree construction, specifying a complexity parameter of -1, a minimum number of obs in a node as 2, and 5-fold cross-validation
+
+tree <- rpart(Classes ~ ., data = train, control = cv)
+printcp(tree)  # To display the cross-validation results
+
+# Choose the tree size that minimizes the cross-validated error
+best_cp <- tree$cptable[which.min(tree$cptable[, "xerror"]), "CP"]
+pruned_tree <- prune(tree, cp = best_cp)
+
+# Make predictions on the test set
+predictions <- predict(pruned_tree, test, type = "class")
+
+# Evaluate the model performance
+conf_matrix <- table(predictions, test$Classes)
+misclassification_rate <- 1 - sum(diag(conf_matrix)) / sum(conf_matrix)
+
+# Print the confusion matrix and misclassification rate
+print(conf_matrix)
+cat("Misclassification Rate CV:", misclassification_rate, "\n")
+cat("Misclassification Percentage Error CV:", misclassification_rate*100, "%\n")
+cat("Accuracy CV:", (1 - misclassification_rate)*100, "%\n")
+
+```
+
+Method - 4 (Random Forests)
+
+Building a Predictive model using Random forests that minimizes test misclassification rate. 
+Then using cross validaion to estimate the error rate.
+
+We are building a Random Forest based method to classify the data
+
+```{r}
+library(randomForest)
+library(caret)
+
+set.seed(123)
+index <- sample(1:nrow(iris), size = 0.7*nrow(iris)) # Randomly samples 70% of the row indices from the created sequence
+train <- iris[index,] # training data set split
+test <- iris[-index,] # testing data set split
+
+iris_rf <- randomForest(Classes~.,data=train,ntree=3,proximity=TRUE)
+print(iris_rf)
+
+
+importance(iris_rf)
+
+irisPred<-predict(iris_rf,newdata=test)
+table(irisPred, test$Classes)
+
+
+print(test$Classes) # printing predictions on test data points
+
+
+#print(sum(irisPred==test$Classes))
+#print(length(test$Classes))
+print(paste('Accuracy is',sum(irisPred==test$Classes)/length(test$Classes) * 100, '%'))
+print(paste('Misclassification Error Rate is', (1 - sum(irisPred==test$Classes)/length(test$Classes))* 100, '%'))
+
+
+```
+
+```{r}
+# Applying cross validation on our own model
+
+# Create 10 folds for cross-validation
+
+folds <- createFolds(train$Classes, k = 10)
+
+# List to store accuracy for each fold
+
+accuracies <- list()
+
+#Performing 10-cross validation
+
+for(i in 1:10){
+  
+  # Select fold for testing 
+  test_index <- folds[[i]]
+  test_fold <- train[test_index,]
+  
+  
+  # Remaining folds for training
+  train_fold <- train[-test_index,] 
+  
+  # Train model on training folds 
+  model <- randomForest(Classes~.,data=train,ntree=3,proximity=TRUE)
+  
+  # Make predictions on test fold
+  preds <- predict(model, test_fold)
+  
+  # Calculate accuracy 
+  accuracy <- mean(preds == test_fold$Classes)
+  
+  # Store accuracy
+  accuracies[[i]] <- accuracy
+}
+
+# Calculate mean accuracy
+mean_accuracy = mean(unlist(accuracies))
+accuracy_in_percentage = mean_accuracy * 100
+print(paste("Mean Accuracy for our Random forest model after 10 fold cross validation comes out to be", accuracy_in_percentage, "%"))
+
+error_in_percentage = (1 - mean_accuracy) * 100
+print(paste("Mean Error percentage of our Random forest model after 10 fold cross validation comes out to be", error_in_percentage, "%"))
+```
+
+Method - 5 (SVM)
+
+Building a Predictive model using SVM(Support Vector Machine) that minimizes test misclassification rate. 
+Then using cross validaion to estimate the error rate.
+
+We are building a SVM based method to classify the data
+
+```{r}
+
+# Load libraries
+library(e1071)
+library(caret)
+
+# Load Iris data  
+data(iris)  
+
+# Create feature matrix
+X <- iris[, 1:4]  
+
+# Create response  
+y <- iris$Species
+
+# SVM Model with linear kernel
+svm_model <- svm(Species ~ ., data = iris, kernel = "linear")
+
+# Predictions
+predictions <- predict(svm_model, newdata = X)
+
+# Accuracy on training data  
+acc_train <- mean(predictions == y)
+
+# Print accuracy on training data
+cat("Estimated Training Accuracy (Without Cross-Validation): ", acc_train * 100, '%', "\n")
+
+# Misclassification rate on training data
+miss_rate_train <- mean(predictions != y)
+
+# Print misclassification rate on training data  
+cat("Estimated Training Misclassification Rate (Without Cross-Validation): ", miss_rate_train * 100, '%' , "\n")
+
+# Cross-Validation with 5 folds
+svm_cv <- train(Species ~.,
+                data = iris,
+                method = "svmLinear",
+                metric="Accuracy",
+                trControl=trainControl(method="cv", number=5))
+               
+# Accuracy from cross validation
+acc_cv <- svm_cv$results$Accuracy
+
+# Print accuracy from cross validation
+print(paste("Estimated Test Accuracy from Cross Validation: ", acc_cv * 100, '%'))
+
+# Misclassification rate on cross validation
+miss_rate_cv <- 1 - svm_cv$results$Accuracy  
+
+# Print misclassification rate from cross validation
+print(paste("Estimated Test Misclassification Rate from Cross Validation: ", miss_rate_cv * 100, '%'))
+```
+
